@@ -3,6 +3,7 @@ import { test } from "node:test";
 import {
   BriefSchema,
   EXAMPLE_BRIEF,
+  LIMITS,
   LyricsRequestSchema,
   applyOperations,
   checkOperations,
@@ -45,7 +46,7 @@ test("brief validation: integer mood 1-5, source length, whitespace kept", () =>
   for (const mood of [0, 6, 4.5, "4"]) assert.equal(BriefSchema.safeParse({ ...EXAMPLE_BRIEF, mood }).success, false);
   assert.equal(BriefSchema.safeParse({ ...EXAMPLE_BRIEF, sourceText: "word ".repeat(99) }).success, false);
   assert.equal(BriefSchema.safeParse({ ...EXAMPLE_BRIEF, sourceText: "word ".repeat(100) }).success, true);
-  assert.equal(BriefSchema.safeParse({ ...EXAMPLE_BRIEF, sourceText: "x".repeat(40_001) }).success, false);
+  assert.equal(BriefSchema.safeParse({ ...EXAMPLE_BRIEF, sourceText: "x".repeat(LIMITS.sourceMax + 1) }).success, false);
   const poem = `  line one\n\n\t${"word ".repeat(98)}line two  \n`;
   assert.equal(BriefSchema.parse({ ...EXAMPLE_BRIEF, sourceText: poem }).sourceText, poem);
   assert.equal(LyricsRequestSchema.safeParse({ action: "publish", brief: EXAMPLE_BRIEF }).success, false);

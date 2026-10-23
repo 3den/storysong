@@ -24,7 +24,7 @@ export const SECTION_LABELS: Record<SectionId, string> = {
 
 export const LIMITS = {
   sourceMinWords: 100,
-  sourceMax: 40_000,
+  sourceMax: 100_000,
   direction: 600,
   request: 600,
   line: 120,
