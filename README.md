@@ -12,7 +12,7 @@ cp .env.example .env.local   # then add your key to DEEPSEEK_API_KEY
 pnpm dev
 ```
 
-Open http://localhost:3000, open the **Keep the Fire** sample song, click **Edit settings**, then **Rewrite the song**. Every draft, review, and revision is a live DeepSeek call, to `deepseek-flash` at `medium` reasoning effort unless `DEEPSEEK_MODEL` or `DEEPSEEK_REASONING_EFFORT` says otherwise. Without a key, the app still loads and shows the server's 503 inline.
+Open http://localhost:3000, open the **Golden Sand** sample song, click **Edit settings**, then **Rewrite the song**. Every draft, review, and revision is a live DeepSeek call, to `deepseek-flash` at `medium` reasoning effort unless `DEEPSEEK_MODEL` or `DEEPSEEK_REASONING_EFFORT` says otherwise. Without a key, the app still loads and shows the server's 503 inline.
 
 ## Test
 

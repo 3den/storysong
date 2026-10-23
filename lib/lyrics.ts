@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { A_DREAM_WITHIN_A_DREAM } from "./a-dream-within-a-dream.ts";
 
 export const GENRES = ["Rock", "Metal", "Pop", "Hip-hop", "R&B", "Country", "Folk", "Jazz", "Electronic"] as const;
 
@@ -28,6 +29,7 @@ export const LIMITS = {
   request: 600,
   line: 120,
   title: 80,
+  storyTitle: 120,
 } as const;
 
 const BREAKS = /[\r\n\u2028\u2029]/;
@@ -53,6 +55,11 @@ const MARKDOWN: [RegExp, string][] = [
 export const markdownToText = (md: string) => MARKDOWN.reduce((text, [pattern, to]) => text.replace(pattern, to), md);
 
 export const BriefSchema = z.object({
+  // Labels the song in the list; never sent to the model. Briefs saved before it existed have none.
+  storyTitle: z
+    .string()
+    .max(LIMITS.storyTitle, `Story title must be at most ${LIMITS.storyTitle} characters.`)
+    .default(""),
   // Never trimmed or normalized: whitespace and line breaks reach the model as typed.
   sourceText: z
     .string()
@@ -66,6 +73,7 @@ export const BriefSchema = z.object({
 export type Brief = z.infer<typeof BriefSchema>;
 
 export const DEFAULT_BRIEF: Brief = {
+  storyTitle: "",
   sourceText: "",
   genre: "Rock",
   mood: 4,
@@ -74,12 +82,12 @@ export const DEFAULT_BRIEF: Brief = {
 };
 
 export const EXAMPLE_BRIEF: Brief = {
-  sourceText:
-    "Mara tends a lighthouse while the island's fishing fleet disappears. First one boat fails to come home, then three, until the harbor sits empty and the village goes quiet. People whisper about her absent brother, who maintained the radio and left the island the week the first boat went down. Mara defends him at the market, at the chapel, and alone on the gallery each night. Then she finds his log in the radio room, tucked behind the spare batteries. In his careful handwriting, he describes the false distress call he sent, the one that led the ships onto the reef. She reads it twice by lamplight. At dawn, she broadcasts the truth on every channel and keeps the lamp burning for anyone still at sea.",
-  genre: "Rock",
-  mood: 4,
+  storyTitle: "A Dream Within a Dream by Edgar Allan Poe",
+  sourceText: A_DREAM_WITHIN_A_DREAM,
+  genre: "Folk",
+  mood: 2,
   narrator: "first",
-  direction: "End the chorus with this exact line: I keep the fire, I keep my name.",
+  direction: "End the chorus with this exact line: Is all we see a dream within a dream?",
 };
 
 /** Why a lyric line is invalid, as a clause, or null if it's fine. */
@@ -229,6 +237,9 @@ export function lineText(draft: Draft, id: string) {
 export function sameBrief(a: Brief, b: Brief) {
   return (Object.keys(a) as (keyof Brief)[]).every((key) => a[key] === b[key]);
 }
+
+/** Whether two briefs write the same song: the story title only labels it. */
+export const sameSettings = (a: Brief, b: Brief) => sameBrief({ ...a, storyTitle: b.storyTitle }, b);
 
 /** Title, section labels, and line breaks: the Copy format. */
 export function lyricsText(draft: Draft) {

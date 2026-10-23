@@ -13,8 +13,8 @@ import {
   withBefore,
 } from "./lyrics.ts";
 import type { Draft, Song } from "./lyrics.ts";
-import { SAMPLE_SONGS, STORIES, parseSongs, withSong } from "./library.ts";
-import { begin, blockedReason, initialState, reducer } from "./state.ts";
+import { SAMPLE_SONGS, STORIES, parseSongs, sampleOriginal, withSong } from "./library.ts";
+import { begin, blockedReason, briefChanged, initialState, reducer } from "./state.ts";
 import type { Action, State } from "./state.ts";
 
 const SONG: Song = {
@@ -154,7 +154,7 @@ test("generate installs a draft; a wrong id or changed brief is ignored", () => 
   assert.equal(s.previous, null);
 
   s = run(s, "generate", 8);
-  s = reducer(s, { type: "edit", patch: { genre: "Folk" } });
+  s = reducer(s, { type: "edit", patch: { genre: "Rock" } });
   assert.equal(s.pending, null);
   assert.match(s.failure!.message, /Stopped because the settings changed/);
   const late = reducer(s, { type: "arrived", id: 8, data: { ...SONG, title: "Late" } });
@@ -226,14 +226,31 @@ test("reviews survive lock changes and clear when the text changes", () => {
 });
 
 test("loading a story file keeps the replaced inputs until the next edit", () => {
-  const story: Action = { type: "loadStory", sourceText: EXAMPLE_BRIEF.sourceText };
+  const story: Action = { type: "loadStory", sourceText: EXAMPLE_BRIEF.sourceText, storyTitle: "lighthouse" };
   assert.equal(reducer(initialState, story).stash, null);
-  const typed = { ...initialState, form: { ...initialState.form, sourceText: "My own long story about a river.", mood: 2 } };
+  const typed = { ...initialState, form: { ...initialState.form, storyTitle: "River", sourceText: "My own long story about a river.", mood: 2 } };
   const s = reducer(typed, story);
   assert.equal(s.form.sourceText, EXAMPLE_BRIEF.sourceText);
-  assert.equal(s.form.mood, 2, "only the story text is replaced");
-  assert.equal(reducer(s, { type: "restoreInputs" }).form.sourceText, typed.form.sourceText);
+  assert.equal(s.form.storyTitle, "lighthouse");
+  assert.equal(s.form.mood, 2, "only the story and its title are replaced");
+  assert.deepEqual(reducer(s, { type: "restoreInputs" }).form, typed.form);
   assert.equal(reducer(s, { type: "edit", patch: { mood: 2 } }).stash, null);
+});
+
+test("the story title only labels the song: renaming never asks for a rewrite and reaches the draft at once", () => {
+  let s = run(ready(), "review", 1);
+  s = reducer(s, { type: "edit", patch: { storyTitle: "Lamp" } });
+  assert.equal(briefChanged(s), false);
+  assert.ok(s.pending, "renaming doesn't stop a running request");
+  assert.equal(s.draft?.brief.storyTitle, "Lamp");
+
+  let g = run({ ...initialState, form: EXAMPLE_BRIEF }, "generate", 2);
+  g = reducer(g, { type: "edit", patch: { storyTitle: "Renamed" } });
+  g = reducer(g, { type: "arrived", id: 2, data: SONG });
+  assert.equal(g.draft?.brief.storyTitle, "Renamed", "a rename during generation isn't lost");
+
+  assert.equal(BriefSchema.parse({ ...EXAMPLE_BRIEF, storyTitle: undefined }).storyTitle, "", "briefs saved before titles existed still parse");
+  assert.equal(BriefSchema.safeParse({ ...EXAMPLE_BRIEF, storyTitle: "x".repeat(121) }).success, false);
 });
 
 test("a new song's first draft gets its id; switching songs drops everything tied to the old one", () => {
@@ -254,7 +271,7 @@ test("a new song's first draft gets its id; switching songs drops everything tie
 });
 
 test("library: stories are valid briefs; saved songs are validated and rewritten only when they change", () => {
-  for (const story of STORIES) assert.ok(BriefSchema.safeParse(story.form).success, story.name);
+  for (const story of STORIES) assert.ok(BriefSchema.safeParse(story.form).success && story.form.storyTitle, story.sample.title);
   assert.equal(SAMPLE_SONGS.length, STORIES.length, "every sample song is a valid draft");
   assert.deepEqual(parseSongs(JSON.stringify(SAMPLE_SONGS)), SAMPLE_SONGS);
   const d = draft();
@@ -269,4 +286,24 @@ test("library: stories are valid briefs; saved songs are validated and rewritten
   const added = withSong(songs, "new", { ...d, title: "Other" }, 5)!;
   assert.deepEqual(added.map((x) => x.id), ["new", "a"]);
   assert.deepEqual(withSong(added, "a", { ...d, revision: 2 }, 6)!.map((x) => x.id), ["a", "new"]);
+});
+
+test("samples: a changed sample offers its original, and restoring it can be undone", () => {
+  const { id, draft: original } = SAMPLE_SONGS[0];
+  // Stored drafts come back with their keys in schema order, and a new revision doesn't count as a change.
+  const stored = parseSongs(JSON.stringify([{ id, updatedAt: 1, draft: { ...original, revision: 7 } }]))[0].draft;
+  assert.equal(sampleOriginal(id, stored), null);
+  assert.equal(sampleOriginal("mine", { ...original, title: "Other" }), null);
+  assert.equal(sampleOriginal(id, { ...original, title: "Other" }), original);
+  assert.equal(sampleOriginal(id, { ...original, brief: { ...original.brief, mood: 5 } }), original);
+  const locked = reducer({ ...initialState, songId: id, form: original.brief, draft: original }, { type: "toggleLock", lineId: "chorus-4" });
+  assert.equal(sampleOriginal(id, locked.draft!), original);
+
+  const edited = { ...locked, form: { ...original.brief, mood: 5 } };
+  const restored = reducer(edited, { type: "restoreOriginal", draft: original });
+  assert.equal(sampleOriginal(id, restored.draft!), null);
+  assert.equal(restored.draft!.revision, locked.draft!.revision + 1);
+  assert.equal(restored.form, original.brief);
+  assert.equal(restored.previous, locked.draft);
+  assert.equal(reducer(restored, { type: "undo" }).draft?.sections[1].lines[3].locked, true);
 });

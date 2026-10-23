@@ -14,7 +14,7 @@ type Run = (kind: ActionKind, sectionId?: SectionId | null) => void;
 
 function Feedback({ draft, review, dispatch }: { draft: Draft; review: Review; dispatch: Dispatch<Action> }) {
   return (
-    <div className="flex flex-col gap-3 rounded-lg border border-border bg-background/40 p-3 text-sm">
+    <div className="flex flex-col gap-3 rounded-lg bg-muted p-3 text-sm">
       <div className="flex items-center justify-between gap-2">
         <h3 className="font-semibold">Feedback · {review.sectionId ? SECTION_LABELS[review.sectionId] : "Whole song"}</h3>
         <Button variant="ghost" className="h-9 px-3" onClick={() => dispatch({ type: "clearReview" })}>
@@ -24,7 +24,7 @@ function Feedback({ draft, review, dispatch }: { draft: Draft; review: Review; d
       <ol className="flex flex-col gap-3">
         {review.findings.map((finding, index) => (
           <li key={index} className="flex gap-3">
-            <span className="font-semibold text-primary" aria-hidden>
+            <span className="font-semibold text-highlight" aria-hidden>
               {index + 1}
             </span>
             <div className="flex flex-col gap-1">
@@ -135,7 +135,7 @@ function SectionBlock({
                 )}
                 {notes ? (
                   <>
-                    <sup className="ml-1 font-sans text-xs font-semibold text-primary" aria-hidden>
+                    <sup className="ml-1 font-sans text-xs font-semibold text-highlight" aria-hidden>
                       {notes.join(",")}
                     </sup>
                     <span className="sr-only">(feedback note {notes.join(", ")})</span>
@@ -184,7 +184,7 @@ function SectionBlock({
                 <Button className="h-10 px-4" onClick={() => onRun("revise")} disabled={reviseBlocked !== null}>
                   {working("revise") ? "Rewriting…" : `Rewrite ${label}`}
                 </Button>
-                <Button variant="outline" className="h-10 px-4" onClick={() => onRun("review", section.id)} disabled={reviewBlocked !== null}>
+                <Button variant="highlight" className="h-10 px-4" onClick={() => onRun("review", section.id)} disabled={reviewBlocked !== null}>
                   {working("review") ? "Getting feedback…" : "Get feedback"}
                 </Button>
               </div>

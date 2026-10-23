@@ -10,6 +10,7 @@ import {
   groundFindings,
   lyricsText,
   sameBrief,
+  sameSettings,
   songToDraft,
 } from "./lyrics.ts";
 import type { Brief, Draft, Finding, Operation, SectionId } from "./lyrics.ts";
@@ -62,9 +63,10 @@ export const initialState: State = {
 
 export type Action =
   | { type: "edit"; patch: Partial<Brief> }
-  | { type: "loadStory"; sourceText: string }
+  | { type: "loadStory"; sourceText: string; storyTitle: string }
   | { type: "newSong" }
   | { type: "openSong"; id: string; draft: Draft }
+  | { type: "restoreOriginal"; draft: Draft }
   | { type: "revertBrief" }
   | { type: "restoreInputs" }
   | { type: "toggleLock"; lineId: string }
@@ -80,7 +82,7 @@ export type Action =
   | { type: "undo" };
 
 export function briefChanged(s: State) {
-  return s.draft !== null && !sameBrief(s.form, s.draft.brief);
+  return s.draft !== null && !sameSettings(s.form, s.draft.brief);
 }
 
 /** Why an action can't start right now, or null if it can. */
@@ -127,7 +129,7 @@ export function begin(s: State, kind: ActionKind, id: number, sectionId = s.sele
 
 /** Why a pending request no longer matches what it was sent for, as a clause. */
 function pendingProblem(s: State, p: Pending): string | null {
-  if (p.kind === "generate") return sameBrief(s.form, p.brief) ? null : "the settings changed";
+  if (p.kind === "generate") return sameSettings(s.form, p.brief) ? null : "the settings changed";
   if (!s.draft || briefChanged(s)) return "the settings changed";
   if (p.kind === "review") return lyricsText(s.draft) === p.text ? null : "the lyrics changed";
   if (s.draft.revision !== p.revision) return "the draft or its locks changed";
@@ -153,7 +155,9 @@ function arrive(s: State, p: Pending, data: unknown): State {
 
   if (p.kind === "generate") {
     const song = SongSchema.safeParse(data);
-    const draft = song.success ? songToDraft(song.data, p.brief, (s.draft?.revision ?? 0) + 1) : "it wasn't a song";
+    // The title may have been renamed while the song was being written.
+    const brief = { ...p.brief, storyTitle: s.form.storyTitle };
+    const draft = song.success ? songToDraft(song.data, brief, (s.draft?.revision ?? 0) + 1) : "it wasn't a song";
     if (typeof draft === "string") return fail(`The new draft was rejected because ${draft}. Nothing changed.`);
     return { ...done, draft, previous: s.draft, proposal: null, songId: p.songId };
   }
@@ -177,15 +181,23 @@ function arrive(s: State, p: Pending, data: unknown): State {
 
 function step(s: State, a: Action): State {
   switch (a.type) {
-    case "edit":
-      return { ...s, form: { ...s.form, ...a.patch }, stash: null };
+    case "edit": {
+      const form = { ...s.form, ...a.patch };
+      // The title isn't a setting, so it reaches the open song, and its Undo snapshot, at once.
+      const titled = (d: Draft | null) => d && { ...d, brief: { ...d.brief, storyTitle: form.storyTitle } };
+      return { ...s, form, stash: null, draft: titled(s.draft), previous: titled(s.previous) };
+    }
     case "loadStory":
-      return replaceForm(s, { ...s.form, sourceText: a.sourceText });
+      return replaceForm(s, { ...s.form, sourceText: a.sourceText, storyTitle: a.storyTitle });
     // Switching songs drops everything tied to the old one, including a running request and Undo.
     case "newSong":
       return initialState;
     case "openSong":
       return { ...initialState, form: a.draft.brief, draft: a.draft, songId: a.id };
+    case "restoreOriginal":
+      // Back to the bundled sample as a new accepted draft, so Undo can bring the edits back.
+      if (!s.draft) return s;
+      return { ...s, form: a.draft.brief, stash: null, previous: s.draft, draft: { ...a.draft, revision: s.draft.revision + 1 }, proposal: null };
     case "revertBrief":
       return s.draft ? replaceForm(s, s.draft.brief) : s;
     case "restoreInputs":

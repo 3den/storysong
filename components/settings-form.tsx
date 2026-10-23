@@ -1,5 +1,6 @@
 "use client";
 
+import { TriangleAlert } from "lucide-react";
 import { useState, type Dispatch, type ReactNode } from "react";
 import { Failure } from "@/components/failure";
 import { Button } from "@/components/ui/button";
@@ -70,6 +71,22 @@ function SettingsForm({
 
   return (
     <div className="flex flex-col gap-5">
+      <div className="flex flex-col gap-2">
+        <Label htmlFor="story-title">Story title (optional)</Label>
+        <input
+          id="story-title"
+          value={form.storyTitle}
+          maxLength={LIMITS.storyTitle}
+          onChange={(e) => edit({ storyTitle: e.target.value })}
+          placeholder="For example: A Dream Within a Dream"
+          aria-describedby="story-title-hint"
+          className="h-10 w-full rounded-lg border border-input bg-input/30 px-2.5 text-sm outline-none placeholder:text-muted-foreground focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/50"
+        />
+        <p id="story-title-hint" className="text-xs text-muted-foreground">
+          Names the song in your list. Changing it doesn&apos;t change the lyrics.
+        </p>
+      </div>
+
       <div className="flex flex-col gap-2">
         <Label htmlFor="source">Story or poem</Label>
         <Textarea
@@ -163,7 +180,7 @@ function SettingsForm({
       <LimitedText
         id="direction"
         label="Note for the writer (optional)"
-        placeholder="For example: end the chorus with “I keep the fire, I keep my name.”"
+        placeholder="For example: end the chorus with “Is all we see a dream within a dream?”"
         value={form.direction}
         limit={LIMITS.direction}
         onChange={(direction) => edit({ direction })}
@@ -197,7 +214,11 @@ export function Composer({ state, dispatch, onGenerate }: { state: State; dispat
     if (file.size > LIMITS.sourceMax * 4) return setFileError(`That file is too long. A story can be up to ${count(LIMITS.sourceMax)} characters.`);
     try {
       const text = await file.text();
-      dispatch({ type: "loadStory", sourceText: type === "md" ? markdownToText(text) : text });
+      dispatch({
+        type: "loadStory",
+        sourceText: type === "md" ? markdownToText(text) : text,
+        storyTitle: file.name.replace(STORY_FILE, "").slice(0, LIMITS.storyTitle),
+      });
       setFileError(null);
     } catch {
       setFileError("Couldn't read that file. Nothing changed.");
@@ -225,7 +246,7 @@ export function Composer({ state, dispatch, onGenerate }: { state: State; dispat
           className="w-full cursor-pointer rounded-lg text-sm text-muted-foreground outline-none focus-visible:ring-3 focus-visible:ring-ring/50 file:mr-3 file:h-10 file:cursor-pointer file:rounded-lg file:border file:border-input file:bg-input/30 file:px-4 file:text-sm file:font-medium file:text-foreground hover:file:bg-input/50"
         />
         <p id="story-file-hint" className="text-xs text-muted-foreground">
-          A .txt or .md file. Its text replaces the story below.
+          A .txt or .md file. Its text replaces the story below, and its name the story title.
         </p>
         {fileError ? (
           <p id="story-file-error" className="text-sm text-destructive">
@@ -264,7 +285,7 @@ export function SongSettings({
   ].join(" · ");
 
   return (
-    <section aria-label="Song settings" className="flex flex-col gap-4 rounded-xl border border-border p-3 sm:p-4">
+    <section aria-label="Song settings" className="flex flex-col gap-4 rounded-xl bg-card p-3 sm:p-4">
       <div className="flex flex-wrap items-center justify-between gap-2">
         <p className="text-sm text-muted-foreground">{summary}</p>
         {changed ? null : (
@@ -276,9 +297,12 @@ export function SongSettings({
       {open ? (
         <>
           {changed ? (
-            <p className="text-sm">
-              <span className="font-semibold text-primary">Settings changed. </span>
-              The lyrics were written with the settings above. Rewrite the song to use the new ones, or discard the changes.
+            <p className="flex gap-2 rounded-lg bg-warning p-3 text-sm text-background">
+              <TriangleAlert className="mt-0.5 size-4 shrink-0" aria-hidden />
+              <span>
+                <span className="font-semibold">Settings changed. </span>
+                The lyrics were written with the settings above. Rewrite the song to use the new ones, or discard the changes.
+              </span>
             </p>
           ) : null}
           <SettingsForm state={state} dispatch={dispatch} onGenerate={onGenerate} submitLabel="Rewrite the song">

@@ -1,13 +1,12 @@
 import { z } from "zod";
 import { LETS_GET_TOGETHER } from "./lets-get-together.ts";
-import { DEFAULT_BRIEF, DraftSchema, EXAMPLE_BRIEF, songToDraft } from "./lyrics.ts";
+import { DEFAULT_BRIEF, DraftSchema, EXAMPLE_BRIEF, lyricsText, sameBrief, songToDraft } from "./lyrics.ts";
 import type { Brief, Draft, Song } from "./lyrics.ts";
 
 /** Bundled stories, each behind a sample song written during development (not by the app) for the first visit. */
-export const STORIES: { name: string; form: Brief; sample: Song }[] = [
+export const STORIES: { form: Brief; sample: Song }[] = [
   {
-    name: "Let's Get Together (Isaac Asimov)",
-    form: { ...DEFAULT_BRIEF, sourceText: LETS_GET_TOGETHER, genre: "Electronic", mood: 3, narrator: "third" },
+    form: { ...DEFAULT_BRIEF, storyTitle: "Let's Get Together by Isaac Asimov", sourceText: LETS_GET_TOGETHER, genre: "Electronic", mood: 3, narrator: "third" },
     sample: {
       title: "Machine Oil",
       verse1: [
@@ -43,39 +42,38 @@ export const STORIES: { name: string; form: Brief; sample: Song }[] = [
     },
   },
   {
-    name: "The Last Lighthouse",
     form: EXAMPLE_BRIEF,
     sample: {
-      title: "Keep the Fire",
+      title: "Golden Sand",
       verse1: [
-        "The boats went out at morning and the reef took them one by one",
-        "By Sunday the harbor was empty and the village held its tongue",
-        "I climbed a hundred iron stairs and lit the lamp against the black",
-        "And every time they said his name, I spat the rumor back",
+        "I kissed you on the brow the morning I went on my way",
+        "You called my years a dream, and I had nothing left to say",
+        "If hope slips out at midnight or it fades in morning light",
+        "Is it any less gone for the hour it took flight?",
       ],
       chorus: [
-        "Burn on, burn on, across the water",
-        "Cut through the storm like a blade through the dark",
-        "Let the tide come for me, let it come harder",
-        "I keep the fire, I keep my name.",
+        "I stand where the long waves roar",
+        "With a handful of sand from the shore",
+        "The tighter I hold it, the faster it falls to the deep",
+        "Is all we see a dream within a dream?",
       ],
       verse2: [
-        "They said he ran the week the first boat went down",
-        "They said the radio went quiet and he slipped out of town",
-        "I stood up in the chapel and I shouted down the pews",
-        "My brother never left a ship to drown, and that's the truth",
+        "I count the grains like hours, and how few they are tonight",
+        "They creep between my knuckles and they vanish from the light",
+        "I'm weeping now, I'm weeping, and the water doesn't care",
+        "It takes the gold I'm holding and it leaves the cold hand bare",
       ],
       bridge: [
-        "Behind the spare batteries I found his careful hand",
-        "One false distress call, logged in ink: the hour, the reef, the plan",
-        "I read it twice by lamplight with my back against the wall",
-        "Then I keyed the radio at dawn and told the island all",
+        "Lord, can I not close my hand a little tighter still",
+        "Can I not save a single one against the water's will",
+        "Just one small grain of all of it to carry home to you",
+        "But the pitiless wave keeps taking, like it always knew",
       ],
       finalChorus: [
-        "Burn on, burn on, for anyone still sailing",
-        "Cut through the storm like a blade through the dark",
-        "I told the truth on every channel, let it break me",
-        "I keep the fire, I keep my name.",
+        "I stand where the long waves roar",
+        "With an empty hand on the shore",
+        "Whatever I held has gone with the tide to the deep",
+        "Is all we see a dream within a dream?",
       ],
     },
   },
@@ -89,6 +87,16 @@ export const SAMPLE_SONGS: SavedSong[] = STORIES.flatMap((story, index) => {
   return typeof draft === "string" ? [] : [{ id: `sample-${index + 1}`, updatedAt: 0, draft }];
 });
 const SEED = JSON.stringify(SAMPLE_SONGS);
+
+const locks = (d: Draft) => d.sections.flatMap((s) => s.lines.map((l) => l.locked)).join();
+
+/** The bundled draft for a sample song that has changed from it, or null. Compares content, since stored drafts reorder keys. */
+export function sampleOriginal(id: string | null, draft: Draft): Draft | null {
+  const sample = SAMPLE_SONGS.find((s) => s.id === id)?.draft;
+  if (!sample) return null;
+  const same = lyricsText(draft) === lyricsText(sample) && sameBrief(draft.brief, sample.brief) && locks(draft) === locks(sample);
+  return same ? null : sample;
+}
 
 // Items from before autosave lack updatedAt and carry extra fields, which parsing drops.
 const SavedSongSchema = z.object({ id: z.string(), updatedAt: z.number().default(0), draft: DraftSchema });
